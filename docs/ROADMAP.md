@@ -10,9 +10,16 @@ Komponen **instrument-gateway** dipisahkan dari modul LIS HOSNEX; adapter protok
 - Prototype listener HL7 MLLP dan ASTM framed TCP.
 - Unit/integration tests dan dokumentasi; tidak menyentuh sistem klinis nyata.
 
+## MVP v0.2 (config + scenario engine)
+- Registry alat: vendor, model, protokol, transport, konfigurasi TCP/serial; in-memory only.
+- Simulation scenarios: normal / abnormal / unknown specimen / patient mismatch / exact replay.
+- Synthetic order query via HTTP as preparation for bidirectional analyzer worklist.
+- Web UI: device configuration, scenario selection, query worklist.
+- Unit and API tests for validation and edge cases.
+
 ## P0 menuju pilot alat fisik
 - Identifikasi vendor/model/interface manual; definisikan profil alat, segment support dan test vectors.
-- RS-232 agent memakai serialport, reconnect/queue/retry, transport isolation.
+- RS-232 agent memakai serialport, reconnect/queue/retry, transport isolation (belum terimplementasi).
 - Kontrak API stabil untuk LIS order/specimen/results, OpenAPI spec dan error catalog.
 - Persistent data store, raw message archive terenkripsi, log audit, idempotency durable.
 - Reconciliation dan hasil abnormal/critical/delta rules, guardrail hasil tidak otomatis terpublikasi.
@@ -20,7 +27,7 @@ Komponen **instrument-gateway** dipisahkan dari modul LIS HOSNEX; adapter protok
 - Instrument simulators serta conformance test di jaringan pilot terpisah.
 
 ## P1
-- Bidirectional analyzer worklist (order download/query).
+- Bidirectional analyzer worklist nyata melalui ASTM / HL7 sesuai interface manual (mock HTTP sudah ada di v0.2).
 - Vendor-specific adapter plugins (Sysmex / Mindray / Roche / Abbott sesuai perangkat uji).
 - LIS workflow: specimen receipt, QC acceptance, validation teknisi/dokter, release, amendment.
 - Mapping katalog lokal -> LOINC secara tervalidasi, kode specimen dan unit UCUM.

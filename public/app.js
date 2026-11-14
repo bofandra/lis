@@ -34,8 +34,8 @@ function renderInstrumentCards() {
     const card = elem('div', undefined, 'instrument');
     card.append(elem('div', instrument.protocol, 'instrument-icon'));
     const info = elem('div', undefined, 'info');
-    info.append(elem('strong', instrument.name), elem('small', instrument.id + ' · ' + instrument.transport));
-    card.append(info, elem('span', '● READY', 'pill'));
+    info.append(elem('strong', instrument.name), elem('small', instrument.id + ' · ' + instrument.vendor + ' / ' + instrument.model + ' · ' + instrument.transport));
+    card.append(info, elem('span', instrument.enabled ? '● CONFIGURED' : '○ DISABLED', 'pill'));
     $('instruments').append(card);
   }
 }
@@ -150,11 +150,132 @@ async function main() {
   $('protocol').addEventListener('change', () => { updateSelect(); loadFixture(); });
   $('load-fixture').addEventListener('click', loadFixture);
   $('refresh').addEventListener('click', refresh);
-  $('simulate-astm').addEventListener('click', () => send('/api/simulate', { protocol: 'ASTM' }));
-  $('simulate-hl7').addEventListener('click', () => send('/api/simulate', { protocol: 'HL7' }));
+  await initConfigAndSimulator();
   $('ingest-form').addEventListener('submit', event => {
     event.preventDefault();
     send('/api/ingest', { protocol: $('protocol').value, instrumentId: $('instrument').value, raw: $('raw').value });
   });
 }
+
+function updateSimSelect() {
+  const prev = $('sim-instrument').value;
+  $('sim-instrument').replaceChildren(...instruments.map(i => {
+    const option = elem('option', i.name + (i.enabled ? '' : ' (disabled)'));
+    option.value = i.id; return option;
+  }));
+  if (instruments.some(i => i.id === prev)) $('sim-instrument').value = prev;
+}
+
+function updateConfigSelect() {
+  const prev = $('cfg-existing').value;
+  const none = elem('option', '+ New instrument profile'); none.value = '';
+  $('cfg-existing').replaceChildren(none, ...instruments.map(i => {
+    const option = elem('option', i.name + ' (' + i.id + ')');
+    option.value = i.id; return option;
+  }));
+  if (instruments.some(i => i.id === prev)) $('cfg-existing').value = prev;
+}
+
+function syncTransportFields() {
+  const serial = $('cfg-transport').value === 'SERIAL_RS232';
+  for (const element of document.querySelectorAll('.serial-field')) element.hidden = !serial;
+  for (const element of document.querySelectorAll('.tcp-field')) element.hidden = serial;
+}
+
+function syncProtocolTransport() {
+  if ($('cfg-transport').value === 'SERIAL_RS232') return;
+  $('cfg-transport').value = $('cfg-protocol').value === 'ASTM' ? 'TCP_ASTM' : 'TCP_MLLP';
+  $('cfg-port').value = $('cfg-protocol').value === 'ASTM' ? '5001' : '2575';
+  syncTransportFields();
+}
+
+function resetConfigForm() {
+  $('config-form').reset();
+  $('cfg-existing').value = '';
+  $('cfg-id').readOnly = false;
+  $('cfg-protocol').value = 'ASTM';
+  syncProtocolTransport();
+}
+
+function loadConfig() {
+  const chosen = instruments.find(i => i.id === $('cfg-existing').value);
+  if (!chosen) return resetConfigForm();
+  $('cfg-id').value = chosen.id;
+  $('cfg-id').readOnly = true;
+  $('cfg-name').value = chosen.name;
+  $('cfg-vendor').value = chosen.vendor;
+  $('cfg-model').value = chosen.model;
+  $('cfg-protocol').value = chosen.protocol;
+  $('cfg-transport').value = chosen.transport;
+  $('cfg-host').value = chosen.connection.host || '127.0.0.1';
+  $('cfg-port').value = chosen.connection.port || (chosen.protocol === 'ASTM' ? 5001 : 2575);
+  $('cfg-path').value = chosen.connection.path || '';
+  $('cfg-baud').value = String(chosen.connection.baudRate || 9600);
+  $('cfg-enabled').checked = chosen.enabled;
+  $('cfg-bidir').checked = chosen.supportsOrderDownload;
+  syncTransportFields();
+}
+
+async function reloadInstruments() {
+  instruments = (await api('/api/instruments')).items;
+  renderInstrumentCards();
+  $('instrument-count').textContent = instruments.length;
+  updateSelect(); updateSimSelect(); updateConfigSelect();
+}
+
+async function initConfigAndSimulator() {
+  const data = await api('/api/simulator/scenarios');
+  $('sim-scenario').replaceChildren(...data.items.map(item => {
+    const option = elem('option', item.label);
+    option.value = item.id; option.title = item.description;
+    return option;
+  }));
+  updateSimSelect();
+  updateConfigSelect();
+  $('cfg-existing').addEventListener('change', loadConfig);
+  $('cfg-reset').addEventListener('click', resetConfigForm);
+  $('cfg-protocol').addEventListener('change', syncProtocolTransport);
+  $('cfg-transport').addEventListener('change', syncTransportFields);
+  $('simulate-selected').addEventListener('click', () => {
+    const instrument = instruments.find(i => i.id === $('sim-instrument').value);
+    if (!instrument) return notify('Pilih instrument terlebih dahulu.');
+    send('/api/simulate', { protocol: instrument.protocol, instrumentId: instrument.id, scenario: $('sim-scenario').value });
+  });
+  $('query-worklist').addEventListener('click', async () => {
+    try {
+      const data = await api('/api/worklist?instrumentId=' + encodeURIComponent($('sim-instrument').value));
+      $('worklist-output').hidden = false;
+      $('worklist-output').textContent = JSON.stringify(data, null, 2);
+      notify('Order query simulation completed.');
+    } catch (error) { notify('Gagal query order: ' + error.message); }
+  });
+  $('config-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const selected = $('cfg-existing').value;
+    const transport = $('cfg-transport').value;
+    const payload = {
+      id: $('cfg-id').value,
+      name: $('cfg-name').value, vendor: $('cfg-vendor').value,
+      model: $('cfg-model').value, protocol: $('cfg-protocol').value,
+      transport,
+      connection: transport === 'SERIAL_RS232'
+        ? { path: $('cfg-path').value, baudRate: Number($('cfg-baud').value), dataBits: 8, stopBits: 1, parity: 'none' }
+        : { host: $('cfg-host').value, port: Number($('cfg-port').value) },
+      enabled: $('cfg-enabled').checked,
+      supportsOrderDownload: $('cfg-bidir').checked
+    };
+    try {
+      const path = selected ? '/api/instruments/' + encodeURIComponent(selected) : '/api/instruments';
+      const method = selected ? 'PATCH' : 'POST';
+      if (selected) delete payload.id;
+      const saved = await api(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      await reloadInstruments();
+      $('cfg-existing').value = saved.instrument.id;
+      loadConfig();
+      notify('Profile saved (metadata only; no hardware connected).');
+    } catch (error) { notify('Gagal menyimpan: ' + error.message); }
+  });
+  resetConfigForm();
+}
+
 main();

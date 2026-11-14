@@ -2,7 +2,8 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { ResultStore } from './store.mjs';
-import { fixtures, instruments, orders } from './fixtures.mjs';
+import { fixtures, orders } from './fixtures.mjs';
+import { scenarios } from './simulator.mjs';
 import { startTransports } from './transports.mjs';
 
 const publicDir = new URL('../public/', import.meta.url);
@@ -29,22 +30,54 @@ async function requestBody(req) {
       throw err;
     }
   }
-  try { return JSON.parse(value); }
-  catch { const err = new Error('Body must be JSON'); err.status = 400; throw err; }
+  try {
+    const parsed = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      throw new Error('Body must be a JSON object');
+    return parsed;
+  } catch {
+    const err = new Error('Body must be a JSON object');
+    err.status = 400;
+    throw err;
+  }
 }
 
 export function createApp(store = new ResultStore()) {
   return http.createServer(async (req, res) => {
-    const pathname = new URL(req.url, 'http://localhost').pathname;
+    const url = new URL(req.url, 'http://localhost');
+    const pathname = url.pathname;
     try {
       if (req.method === 'GET' && pathname === '/health')
         return json(res, 200, { ok: true, app: 'hosnex-lis-prototype', mode: 'prototype' });
       if (req.method === 'GET' && pathname === '/api/instruments')
-        return json(res, 200, { items: instruments });
+        return json(res, 200, { items: store.registry.list() });
+      if (req.method === 'POST' && pathname === '/api/instruments')
+        return json(res, 201, { instrument: store.registry.create(await requestBody(req)) });
+      if (pathname.startsWith('/api/instruments/')) {
+        const id = decodeURIComponent(pathname.slice('/api/instruments/'.length));
+        if (req.method === 'GET') {
+          const instrument = store.registry.get(id);
+          return json(res, instrument ? 200 : 404, instrument || { error: 'Instrument not found' });
+        }
+        if (req.method === 'PATCH')
+          return json(res, 200, { instrument: store.registry.update(id, await requestBody(req)) });
+      }
       if (req.method === 'GET' && pathname === '/api/orders')
         return json(res, 200, { items: orders });
       if (req.method === 'GET' && pathname === '/api/fixtures')
         return json(res, 200, fixtures);
+      if (req.method === 'GET' && pathname === '/api/simulator/scenarios')
+        return json(res, 200, { items: scenarios });
+      if (req.method === 'GET' && pathname === '/api/worklist') {
+        const instrumentId = url.searchParams.get('instrumentId');
+        if (!instrumentId) return json(res, 400, { error: 'instrumentId is required' });
+        return json(res, 200, store.worklist(instrumentId, url.searchParams.get('sampleId')));
+      }
+      if (req.method === 'POST' && pathname === '/api/worklist/query') {
+        const body = await requestBody(req);
+        if (typeof body.instrumentId !== 'string') return json(res, 400, { error: 'instrumentId is required' });
+        return json(res, 200, store.worklist(body.instrumentId, body.sampleId || null));
+      }
       if (req.method === 'GET' && pathname === '/api/results')
         return json(res, 200, { items: store.list(), stats: store.stats() });
       if (req.method === 'GET' && pathname.startsWith('/api/results/')) {
@@ -58,7 +91,7 @@ export function createApp(store = new ResultStore()) {
       }
       if (req.method === 'POST' && pathname === '/api/simulate') {
         const body = await requestBody(req);
-        const result = store.simulate(body.protocol);
+        const result = store.simulate(body.protocol, { instrumentId: body.instrumentId, scenario: body.scenario });
         return json(res, result.duplicate ? 200 : 201, result);
       }
       if (req.method === 'GET' && allowedFiles[pathname]) {
