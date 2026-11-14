@@ -1,0 +1,12 @@
+{
+  "name": "hosnex-lis-analyzer-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local-first prototype for laboratory analyzer ASTM and HL7 integration",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/server.mjs",
+    "test": "node --test tests/*.test.mjs"
+  }
+}

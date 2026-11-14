@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HOSNEX LIS | Analyzer Integration</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-icon">✳</span><div>HOSNEX <strong>LIS</strong><small>LAB CONNECT</small></div></div>
+      <p class="side-label">WORKSPACE</p>
+      <div class="side-link active">▦ <span>Overview</span></div>
+      <div class="side-link">◈ <span>Instrument Gateway</span></div>
+      <div class="side-link">▤ <span>Incoming Results</span></div>
+      <div class="side-link">☷ <span>Specimen Orders</span></div>
+      <div class="side-bottom">
+        <span class="dot"></span> LOCAL DEMONSTRATION
+        <p>Data sintetis. Bukan untuk keputusan klinis atau koneksi produksi.</p>
+      </div>
+    </aside>
+    <main class="content">
+      <div class="eyebrow">LABORATORY INFORMATION SYSTEM <span class="chip">Prototype v0.1</span></div>
+      <header>
+        <div><h1>Analyzer integration</h1><p>Terima hasil alat, normalisasi data, dan cocokkan dengan order laboratorium.</p></div>
+        <span class="local-indicator"><span class="dot"></span> Local API</span>
+      </header>
+      <section class="kpis">
+        <div class="card kpi"><span class="kpi-label">Incoming results</span><strong id="total">0</strong><span>Pesan diterima</span></div>
+        <div class="card kpi"><span class="kpi-label">Pending review</span><strong id="pending">0</strong><span>Perlu verifikasi petugas</span></div>
+        <div class="card kpi"><span class="kpi-label">Unmatched specimen</span><strong id="unmatched">0</strong><span>Belum ditemukan order</span></div>
+        <div class="card kpi"><span class="kpi-label">Instruments</span><strong id="instrument-count">2</strong><span>Demo analyzer</span></div>
+      </section>
+      <section class="main-grid">
+        <div class="card padded">
+          <div class="section-head"><div><span class="overline">SIMULATOR</span><h2>Instrument gateway</h2></div><span class="chip green">READY</span></div>
+          <p class="muted">Kirim pesan contoh ASTM atau HL7. Tidak memerlukan alat fisik.</p>
+          <div id="instruments" class="instruments"></div>
+          <div class="actions">
+            <button id="simulate-astm" class="primary">▶ Simulasi ASTM</button>
+            <button id="simulate-hl7" class="secondary">▶ Simulasi HL7</button>
+          </div>
+        </div>
+        <div class="card padded">
+          <div class="section-head"><div><span class="overline">MANUAL INGEST</span><h2>Uji payload analyzer</h2></div><span class="chip">POST /api/ingest</span></div>
+          <p class="muted">Tempel pesan asli dari alat setelah menghapus identitas pasien.</p>
+          <form id="ingest-form">
+            <div class="fields"><label>Protocol<select id="protocol"><option value="ASTM">ASTM</option><option value="HL7">HL7 v2 ORU</option></select></label>
+            <label>Instrument<select id="instrument"></select></label></div>
+            <label>Raw message<textarea id="raw" rows="7" spellcheck="false" placeholder="Pilih contoh atau paste payload..."></textarea></label>
+            <div class="actions"><button id="load-fixture" type="button" class="secondary">Load contoh</button><button class="primary" type="submit">Parse & ingest →</button></div>
+          </form>
+        </div>
+      </section>
+      <section class="card padded results-card">
+        <div class="section-head"><div><span class="overline">LIS WORKLIST</span><h2>Hasil pemeriksaan masuk</h2></div><button id="refresh" class="secondary small">↻ Refresh</button></div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Waktu</th><th>Sample / Order</th><th>Analyzer</th><th>Protocol</th><th>Observations</th><th>Status</th><th></th></tr></thead><tbody id="results"></tbody></table>
+        </div>
+        <div id="empty" class="empty">Belum ada hasil. Jalankan simulasi untuk melihat alurnya.</div>
+        <div id="details" class="details" hidden></div>
+      </section>
+      <section class="footer-note">○ Semua hasil selalu <strong>pending review</strong>; prototype tidak memfinalisasi hasil, membuat tagihan, atau mengirim data ke SATUSEHAT.</section>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </main>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
