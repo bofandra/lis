@@ -21,7 +21,7 @@
       </div>
     </aside>
     <main class="content">
-      <div class="eyebrow">LABORATORY INFORMATION SYSTEM <span class="chip">Prototype v0.1</span></div>
+      <div class="eyebrow">LABORATORY INFORMATION SYSTEM <span class="chip">Prototype v0.2</span></div>
       <header>
         <div><h1>Analyzer integration</h1><p>Terima hasil alat, normalisasi data, dan cocokkan dengan order laboratorium.</p></div>
         <span class="local-indicator"><span class="dot"></span> Local API</span>
@@ -37,10 +37,16 @@
           <div class="section-head"><div><span class="overline">SIMULATOR</span><h2>Instrument gateway</h2></div><span class="chip green">READY</span></div>
           <p class="muted">Kirim pesan contoh ASTM atau HL7. Tidak memerlukan alat fisik.</p>
           <div id="instruments" class="instruments"></div>
-          <div class="actions">
-            <button id="simulate-astm" class="primary">▶ Simulasi ASTM</button>
-            <button id="simulate-hl7" class="secondary">▶ Simulasi HL7</button>
+          <div class="fields simulator-selectors">
+            <label>Instrument<select id="sim-instrument"></select></label>
+            <label>Test scenario<select id="sim-scenario"></select></label>
           </div>
+          <div class="actions">
+            <button id="simulate-selected" class="primary">▶ Run scenario</button>
+            <button id="query-worklist" class="secondary">↔ Query order (demo)</button>
+          </div>
+          <pre id="worklist-output" class="worklist-output" hidden></pre>
+
         </div>
         <div class="card padded">
           <div class="section-head"><div><span class="overline">MANUAL INGEST</span><h2>Uji payload analyzer</h2></div><span class="chip">POST /api/ingest</span></div>
@@ -52,6 +58,33 @@
             <div class="actions"><button id="load-fixture" type="button" class="secondary">Load contoh</button><button class="primary" type="submit">Parse & ingest →</button></div>
           </form>
         </div>
+      </section>
+
+      <section class="card padded config-card">
+        <div class="section-head"><div><span class="overline">DEVICE REGISTRY</span><h2>Instrument configuration</h2></div><span class="chip">CONFIGURATION ONLY</span></div>
+        <p class="muted">Daftarkan profil analyzer, protokol, dan setelan komunikasi. Data hanya dalam memori; formulir ini tidak menghubungkan alat fisik.</p>
+        <label class="config-selector">Pilih untuk mengubah profil
+          <select id="cfg-existing"><option value="">+ New instrument profile</option></select>
+        </label>
+        <form id="config-form">
+          <div class="config-grid">
+            <label>Instrument ID<input id="cfg-id" maxlength="64" required placeholder="e.g. hema-lab-02"></label>
+            <label>Display name<input id="cfg-name" maxlength="100" required placeholder="Hematology Analyzer A"></label>
+            <label>Vendor<input id="cfg-vendor" maxlength="80" required placeholder="Vendor or Generic"></label>
+            <label>Model<input id="cfg-model" maxlength="80" required placeholder="Model number"></label>
+            <label>Protocol<select id="cfg-protocol"><option value="ASTM">ASTM</option><option value="HL7">HL7 v2</option></select></label>
+            <label>Transport<select id="cfg-transport"><option value="TCP_ASTM">ASTM TCP</option><option value="TCP_MLLP">HL7 MLLP TCP</option><option value="SERIAL_RS232">Serial / RS-232 (metadata)</option></select></label>
+            <label class="tcp-field">Host / IP<input id="cfg-host" value="127.0.0.1" placeholder="127.0.0.1"></label>
+            <label class="tcp-field">Port<input id="cfg-port" type="number" min="1" max="65535" value="5001"></label>
+            <label class="serial-field" hidden>Serial path<input id="cfg-path" placeholder="/dev/ttyUSB0 or COM3"></label>
+            <label class="serial-field" hidden>Baud rate<select id="cfg-baud"><option value="9600">9600</option><option value="19200">19200</option><option value="38400">38400</option><option value="115200">115200</option><option value="4800">4800</option><option value="2400">2400</option><option value="1200">1200</option><option value="57600">57600</option></select></label>
+          </div>
+          <div class="check-row">
+            <label><input type="checkbox" id="cfg-enabled" checked> Enabled for demo ingest</label>
+            <label><input type="checkbox" id="cfg-bidir"> Enable simulated order query</label>
+          </div>
+          <div class="actions"><button type="submit" class="primary">Save profile</button><button type="button" id="cfg-reset" class="secondary">New / reset</button></div>
+        </form>
       </section>
       <section class="card padded results-card">
         <div class="section-head"><div><span class="overline">LIS WORKLIST</span><h2>Hasil pemeriksaan masuk</h2></div><button id="refresh" class="secondary small">↻ Refresh</button></div>

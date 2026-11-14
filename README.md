@@ -10,13 +10,16 @@ Prototype terbuka untuk mempelajari **pengambilan hasil pemeriksaan dari alat la
     cd lis
     npm start
 
-Buka **http://127.0.0.1:4000**. Dashboard menyediakan:
+Buka **http://127.0.0.1:4000**. Dashboard v0.2 menyediakan:
 - Dua instrument sintetis (chemistry ASTM dan hematology HL7).
 - Tombol simulasi pesan analyzer, dan form input raw message.
 - Parsing hasil, normalisasi pemeriksaan, mapping LOINC contoh, serta matching sample ID ke order.
 - Tampilan daftar hasil, status PENDING_REVIEW, UNMATCHED_ORDER, atau PATIENT_MISMATCH.
 - Proteksi ingest duplikat berdasarkan SHA-256 pesan + instrument + protokol.
-- Data hanya dalam memori (restart menghapus semua hasil).
+- Registrasi dan perubahan konfigurasi analyzer (vendor, model, ASTM/HL7, TCP/RS-232 metadata).
+- Simulasi skenario normal, abnormal, unknown specimen, patient mismatch, dan replay identik.
+- Simulasi query order LIS ke analyzer (worklist bidirectional **via HTTP demo**, belum pengiriman order ke alat).
+- Data hanya dalam memori (restart menghapus konfigurasi tambahan dan seluruh hasil).
 
 Jalankan tes:
 
@@ -27,7 +30,13 @@ Jalankan tes:
 | Method | Path | Deskripsi |
 |---|---|---|
 | GET | /health | Health check |
-| GET | /api/instruments | Demo device registry |
+| GET | /api/instruments | Profil device registry |
+| GET | /api/instruments/:id | Profil satu instrument |
+| POST | /api/instruments | Tambah profil instrument |
+| PATCH | /api/instruments/:id | Ubah konfigurasi instrument |
+| GET | /api/simulator/scenarios | Daftar skenario simulator |
+| GET | /api/worklist?instrumentId=... | Query order sintetis |
+| POST | /api/worklist/query | Query order sintetis via JSON |
 | GET | /api/orders | Demo lab orders |
 | GET | /api/fixtures | Raw ASTM/HL7 contoh |
 | GET | /api/results | Hasil dan agregasi |
@@ -40,6 +49,25 @@ Contoh:
     curl -X POST http://127.0.0.1:4000/api/simulate \
       -H 'Content-Type: application/json' \
       -d '{"protocol":"ASTM"}'
+
+Simulator skenario dapat dipanggil berulang (setiap payload punya identitas baru):
+
+    curl -X POST http://127.0.0.1:4000/api/simulate \
+      -H 'Content-Type: application/json' \
+      -d '{"instrumentId":"chem-astm-01","protocol":"ASTM","scenario":"abnormal"}'
+
+Skenario: normal, abnormal, unknown-sample, patient-mismatch, duplicate.
+Skenario duplicate mengirim ulang pesan simulasi terakhir untuk instrument tersebut.
+
+Contoh API bidirectional mock:
+
+    curl 'http://127.0.0.1:4000/api/worklist?instrumentId=hema-hl7-01'
+
+Registrasi konfigurasi serial (metadata; **tidak membuka port serial**):
+
+    curl -X POST http://127.0.0.1:4000/api/instruments \
+      -H 'Content-Type: application/json' \
+      -d '{"id":"lab-serial-03","name":"Analyzer demo RS-232","vendor":"Generic","model":"S1","protocol":"ASTM","transport":"SERIAL_RS232","connection":{"path":"/dev/ttyUSB0","baudRate":9600,"dataBits":8,"stopBits":1,"parity":"none"},"enabled":true,"supportsOrderDownload":false}'
 
 Untuk ingest manual, gunakan JSON:
 
@@ -81,7 +109,10 @@ Fixture ada di src/fixtures.mjs; parser ada di src/parsers.mjs; business flow di
 - ASTM hanya subset record H/P/O/R/L; HL7 hanya subset ORU^R01 dengan delimiter standar. **Tidak mendukung semua dialek vendor**.
 - Mapping LOINC adalah **contoh**; verifikasi kode pemeriksaan, satuan, spesimen dan metode sebelum integrasi nyata.
 - Belum ada bidirectional order download (query/worklist), rerun/amended result handling, QC, critical value alerts, calibration, multi-instrument sample routing, audit permanen, atau release hasil.
+- Form konfigurasi bersifat **in-memory metadata only**. Tidak membuka koneksi baru, tidak melakukan port scanning, tidak menghubungkan serial/RS-232 sungguhan. Listener TCP opsional v0.1 tetap menggunakan instrumen demo default saja.
+- Mock order query via HTTP **bukan implementasi ASTM/HL7 bidirectional instrument handshake**.
+- Belum ada autentikasi dan otorisasi, sehingga tetap bind HTTP ke localhost. Jangan deploy apa adanya pada jaringan terbuka.
 - Tidak ada integrasi FHIR/SATUSEHAT maupun koneksi langsung ke HOSNEX/simrs-api.
 - UI/API hanya pada proses lokal Node.js: **GitHub Pages tidak bisa menjalankan backend** ini tanpa runtime Node.js.
 
-Lihat [rencana kelanjutan](docs/ROADMAP.md).
+Lihat [spesifikasi API v0.2](docs/API.md) dan [rencana kelanjutan](docs/ROADMAP.md).
